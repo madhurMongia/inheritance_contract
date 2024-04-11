@@ -1,121 +1,111 @@
-import { expect } from 'chai';
-import { BN, expectEvent, expectRevert, time } from '@openzeppelin/test-helpers';
-import { ethers } from 'hardhat';
-import { InheritanceContract__factory } from '../typechain-types/factories/InheritanceContract__factory';
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { InheritanceContract } from "../types/contracts/inheritance.sol";
+import {InheritanceContract__factory} from "../types/factories/contracts/inheritance.sol/index"
 
-describe('InheritanceContract', () => {
-    const oneMonth = time.duration.days(30);
+describe("InheritanceContract", function () {
+  let inheritanceContract: InheritanceContract;
+  let owner: SignerWithAddress;
+  let heir: SignerWithAddress;
+  let newHeir: SignerWithAddress;
+  let other: SignerWithAddress;
 
-    let inheritanceContract: ethers.Contract;
-    let owner: ethers.Wallet;
-    let heir: string;
-    let newHeir: string;
-    let other: ethers.Wallet;
+  beforeEach(async function () {
+    [owner, heir, newHeir, other] = await ethers.getSigners();
+    const amount = ethers.parseEther("1");
+    const InheritanceContractFactory = await ethers.getContractFactory("InheritanceContract") as unknown as InheritanceContract__factory ;
+    inheritanceContract = await InheritanceContractFactory.deploy(heir.address, {value : amount })
+    await inheritanceContract.waitForDeployment();
+  });
 
-    before(async () => {
-        [owner, other] = await ethers.getSigners();
-        heir = '0xDC708d851361f1F8905bB6fb10D6868b8d010810';
-        newHeir = '0xDC708d851361f1F8905bB6fb10D6868b8d010811'; // an example address for testing
+  it("should set the correct owner and heir during deployment", async function () {
+    expect(await inheritanceContract.owner()).to.equal(owner.address);
+    expect(await inheritanceContract.heir()).to.equal(heir.address);
+  });
 
-        const inheritanceContractFactory = new InheritanceContract__factory(owner);
-        inheritanceContract = await inheritanceContractFactory.deploy(heir);
-        await inheritanceContract.deployed();
-    });
+  it("should allow the owner to withdraw funds", async function () {
+    const contractAddress = await inheritanceContract.getAddress();
+    const ownerBalanceBefore = await ethers.provider.getBalance(owner.address);
+    const contractBalanceBefore = await ethers.provider.getBalance(contractAddress);
+  
+    await expect(inheritanceContract.connect(owner).withdraw(ethers.parseEther("1")))
+      .to.emit(inheritanceContract, "FundsWithdrawn")
+      .withArgs(owner.address, ethers.parseEther("1"));
+  
+    const ownerBalanceAfter = await ethers.provider.getBalance(owner.address);
+    const contractBalanceAfter = await ethers.provider.getBalance(contractAddress);
+    expect(ownerBalanceAfter).to.be.gt(ownerBalanceBefore);
+    expect(contractBalanceAfter).to.be.lt(contractBalanceBefore);
+  });
 
-    it('should set the correct owner and heir upon deployment', async () => {
-        expect(await inheritanceContract.owner()).to.equal(owner.address);
-        expect(await inheritanceContract.heir()).to.equal(heir);
-    });
+  it("should not allow non-owner to withdraw funds", async function () {
+    await expect(inheritanceContract.connect(other).withdraw(ethers.parseEther('2')))
+    .to.be.revertedWithCustomError(inheritanceContract, "OwnableUnauthorizedAccount")
+    .withArgs(other.address);
+  });
 
-    it('should allow the owner to withdraw funds', async () => {
-        const amount = ethers.utils.parseEther('1');
-        await inheritanceContract.send(amount);
+  it("should not allow withdrawal if insufficient contract balance", async function () {
+    await expect(inheritanceContract.withdraw(ethers.parseEther('2'))).to.be.revertedWith(
+      "Insufficient contract balance."
+    );
+  });
 
-        const initialBalance = await inheritanceContract.provider.getBalance(inheritanceContract.address);
-        const initialOwnerBalance = await owner.getBalance();
+  it("should allow the owner to set a new heir", async function () {
+    await expect(inheritanceContract.setHeir(newHeir.address))
+      .to.emit(inheritanceContract, "HeirChanged")
+      .withArgs(heir.address, newHeir.address);
 
-        const tx = await inheritanceContract.withdraw(amount);
+    expect(await inheritanceContract.heir()).to.equal(newHeir.address);
+  });
 
-        const newBalance = await inheritanceContract.provider.getBalance(inheritanceContract.address);
-        const newOwnerBalance = await owner.getBalance();
+  it("should not allow non-owner to set a new heir", async function () {
+    await expect(inheritanceContract.connect(other).setHeir(newHeir.address)).to.be.revertedWithCustomError(inheritanceContract, "OwnableUnauthorizedAccount")
+    .withArgs(other.address);
+  });
 
-        expect(newBalance).to.be.eq(initialBalance.sub(amount));
-        expect(newOwnerBalance).to.be.gt(initialOwnerBalance);
+  it("should not allow setting the zero address as heir", async function () {
+    await expect(inheritanceContract.setHeir(ethers.ZeroAddress)).to.be.revertedWith(
+      "Heir cannot be the zero address."
+    );
+  });
 
-        expectEvent(tx, 'FundsWithdrawn', { recipient: owner.address, amount: new BN(amount) });
-    });
+  it("should not allow setting the owner as heir", async function () {
+    await expect(inheritanceContract.setHeir(owner.address)).to.be.revertedWith(
+      "Owner cannot be the heir."
+    );
+  });
 
-    it('should not allow non-owner to withdraw funds', async () => {
-        await expectRevert(
-            inheritanceContract.connect(other).withdraw(ethers.utils.parseEther('1')),
-            'Only the owner can withdraw funds.'
-        );
-    });
+  it("should allow the heir to claim ownership after the delay period", async function () {
+    await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]); // Increase time by 30 days
+    await ethers.provider.send("evm_mine"); // Mine a new block
 
-    it('should not allow withdrawing more than the contract balance', async () => {
-        const amount = ethers.utils.parseEther('1');
-        await inheritanceContract.send(amount);
+    await expect(inheritanceContract.connect(heir).claimOwnership(newHeir.address))
+      .to.emit(inheritanceContract, "HeirChanged")
+      .withArgs(heir.address, newHeir.address);
 
-        await expectRevert(
-            inheritanceContract.withdraw(ethers.utils.parseEther('2')),
-            'Insufficient contract balance.'
-        );
-    });
+    expect(await inheritanceContract.heir()).to.equal(newHeir.address);
+  });
 
-    it('should allow the heir to claim ownership after one month of inactivity', async () => {
-        await time.increase(oneMonth.add(time.duration.seconds(1)));
+  it("should not allow non-heir to claim ownership", async function () {
+    await expect(inheritanceContract.connect(other).claimOwnership(newHeir.address)).to.be.revertedWith(
+      "Only the designated heir can claim ownership."
+    );
+  });
 
-        const tx = await inheritanceContract.claimOwnership(newHeir);
+  it("should not allow claiming ownership before the delay period", async function () {
+    await expect(inheritanceContract.connect(heir).claimOwnership(newHeir.address)).to.be.revertedWith(
+      "The owner still has control."
+    );
+  });
 
-        expect(await inheritanceContract.owner()).to.equal(heir);
-        expect(await inheritanceContract.heir()).to.equal(newHeir);
+  it("should not allow claiming ownership with the zero address as new heir", async function () {
+    await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]); // Increase time by 30 days
+    await ethers.provider.send("evm_mine"); // Mine a new block
 
-        expectEvent(tx, 'OwnershipTransferred', { previousOwner: owner.address, newOwner: newHeir });
-    });
-
-    it('should not allow non-heir to claim ownership', async () => {
-        await time.increase(oneMonth.add(time.duration.seconds(1)));
-
-        await expectRevert(
-            inheritanceContract.connect(other).claimOwnership(other),
-            'Only the designated heir can claim ownership.'
-        );
-    });
-
-    it('should not allow heir to claim ownership before one month of inactivity', async () => {
-        await expectRevert(
-            inheritanceContract.claimOwnership(newHeir),
-            'The owner still has control.'
-        );
-    });
-
-    it('should allow the owner to set a new heir', async () => {
-        const tx = await inheritanceContract.setHeir(newHeir);
-
-        expect(await inheritanceContract.heir()).to.equal(newHeir);
-
-        expectEvent(tx, 'HeirChanged', { previousHeir: heir, newHeir: newHeir });
-    });
-
-    it('should not allow non-owner to set a new heir', async () => {
-        await expectRevert(
-            inheritanceContract.connect(other).setHeir(newHeir),
-            'Only the owner can set the heir.'
-        );
-    });
-
-    it('should not allow setting the zero address as heir', async () => {
-        await expectRevert(
-            inheritanceContract.setHeir(ethers.constants.AddressZero),
-            'Heir cannot be the zero address.'
-        );
-    });
-
-    it('should not allow setting the owner as heir', async () => {
-        await expectRevert(
-            inheritanceContract.setHeir(owner.address),
-            'Owner cannot be the heir.'
-        );
-    });
+    await expect(inheritanceContract.connect(heir).claimOwnership(ethers.ZeroAddress)).to.be.revertedWith(
+      "New heir cannot be the zero address."
+    );
+  });
 });
 

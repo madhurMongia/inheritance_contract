@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -10,7 +10,7 @@ contract InheritanceContract is Ownable {
     event HeirChanged(address previousHeir, address newHeir);
     event FundsWithdrawn(address recipient, uint256 amount);
 
-    constructor(address _heir) {
+    constructor(address _heir) Ownable(msg.sender) payable {
         require(_heir != address(0), "Heir cannot be the zero address.");
         heir = _heir;
         lastWithdrawalTimestamp = block.timestamp;
@@ -40,7 +40,6 @@ contract InheritanceContract is Ownable {
         address previousHeir = heir;
         heir = _newheir;
         lastWithdrawalTimestamp = block.timestamp;
-        emit OwnershipTransferred(owner(), _newheir);
         emit HeirChanged(previousHeir, _newheir);
     }
 
