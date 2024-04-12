@@ -1,53 +1,67 @@
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-
-contract InheritanceContract is Ownable {
+/**
+ * @title InheritanceContract
+ * @dev A contract that allows the owner to designate an heir and transfer ownership after a certain delay.
+ */
+contract InheritanceContract {
+    address public owner;
     address public heir;
     uint256 public lastWithdrawalTimestamp;
-    uint256 public constant OWNERSHIP_TRANSFER_DELAY_DAYS = 30 days;
+    uint256 public constant OWNERSHIP_TRANSFER_DELAY = 30 days;
 
     event HeirChanged(address previousHeir, address newHeir);
     event FundsWithdrawn(address recipient, uint256 amount);
+    event OwnershipTransferred(address previousOwner, address newOwner);
 
-    constructor(address _heir) Ownable(msg.sender) payable {
-        require(_heir != address(0), "Heir cannot be the zero address.");
+    /**
+     * @dev Constructor function that sets the initial owner and heir.
+     * @param _heir The address of the designated heir.
+     */
+    constructor(address _heir) payable {
+        owner = msg.sender;
         heir = _heir;
         lastWithdrawalTimestamp = block.timestamp;
     }
 
-    function withdraw(uint256 amount) external onlyOwner {
-        require(
-            address(this).balance >= amount,
-            "Insufficient contract balance."
-        );
+    /**
+     * @dev Allows the owner to withdraw funds from the contract.
+     * @param amount The amount of funds to withdraw.
+     */
+    function withdraw(uint256 amount) external {
+        require(msg.sender == owner, "Only the owner can withdraw funds.");
         lastWithdrawalTimestamp = block.timestamp;
-        payable(owner()).transfer(amount);
-        emit FundsWithdrawn(owner(), amount);
+        payable(owner).transfer(amount);
+        emit FundsWithdrawn(owner, amount);
     }
 
-    function claimOwnership(address _newheir) external {
+    /**
+     * @dev Allows the designated heir to claim ownership of the contract after the specified delay.
+     * @param _newHeir The address of the new heir.
+     */
+    function claimOwnership(address _newHeir) external {
+        require(msg.sender == heir, "Only the designated heir can claim ownership.");
         require(
-            msg.sender == heir,
-            "Only the designated heir can claim ownership."
-        );
-        require(
-            block.timestamp >
-                lastWithdrawalTimestamp + OWNERSHIP_TRANSFER_DELAY_DAYS,
+            block.timestamp > lastWithdrawalTimestamp + OWNERSHIP_TRANSFER_DELAY,
             "The owner still has control."
         );
-        require(_newheir != address(0), "New heir cannot be the zero address.");
-        address previousHeir = heir;
-        heir = _newheir;
+        address previousOwner = owner;
+        owner = heir;
+        heir = _newHeir;
         lastWithdrawalTimestamp = block.timestamp;
-        emit HeirChanged(previousHeir, _newheir);
+        emit OwnershipTransferred(previousOwner, owner);
+        emit HeirChanged(heir, _newHeir);
     }
 
-    function setHeir(address _heir) external onlyOwner {
-        require(_heir != address(0), "Heir cannot be the zero address.");
-        require(_heir != owner(), "Owner cannot be the heir.");
+    /**
+     * @dev Allows the owner to set a new heir.
+     * @param _heir The address of the new heir.
+     */
+    function setHeir(address _heir) external {
+        require(msg.sender == owner, "Only the owner can set a new heir.");
         address previousHeir = heir;
         heir = _heir;
         emit HeirChanged(previousHeir, _heir);
     }
 }
+

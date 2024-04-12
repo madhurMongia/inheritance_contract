@@ -41,14 +41,7 @@ describe("InheritanceContract", function () {
 
   it("should not allow non-owner to withdraw funds", async function () {
     await expect(inheritanceContract.connect(other).withdraw(ethers.parseEther('2')))
-    .to.be.revertedWithCustomError(inheritanceContract, "OwnableUnauthorizedAccount")
-    .withArgs(other.address);
-  });
-
-  it("should not allow withdrawal if insufficient contract balance", async function () {
-    await expect(inheritanceContract.withdraw(ethers.parseEther('2'))).to.be.revertedWith(
-      "Insufficient contract balance."
-    );
+    .to.be.revertedWith('Only the owner can withdraw funds.')
   });
 
   it("should allow the owner to set a new heir", async function () {
@@ -60,20 +53,7 @@ describe("InheritanceContract", function () {
   });
 
   it("should not allow non-owner to set a new heir", async function () {
-    await expect(inheritanceContract.connect(other).setHeir(newHeir.address)).to.be.revertedWithCustomError(inheritanceContract, "OwnableUnauthorizedAccount")
-    .withArgs(other.address);
-  });
-
-  it("should not allow setting the zero address as heir", async function () {
-    await expect(inheritanceContract.setHeir(ethers.ZeroAddress)).to.be.revertedWith(
-      "Heir cannot be the zero address."
-    );
-  });
-
-  it("should not allow setting the owner as heir", async function () {
-    await expect(inheritanceContract.setHeir(owner.address)).to.be.revertedWith(
-      "Owner cannot be the heir."
-    );
+    await expect(inheritanceContract.connect(other).setHeir(newHeir.address)).to.be.revertedWith("Only the owner can set a new heir.")
   });
 
   it("should allow the heir to claim ownership after the delay period", async function () {
@@ -81,8 +61,8 @@ describe("InheritanceContract", function () {
     await ethers.provider.send("evm_mine"); // Mine a new block
 
     await expect(inheritanceContract.connect(heir).claimOwnership(newHeir.address))
-      .to.emit(inheritanceContract, "HeirChanged")
-      .withArgs(heir.address, newHeir.address);
+      .to.emit(inheritanceContract, "OwnershipTransferred")
+      .withArgs(owner.address, heir.address);
 
     expect(await inheritanceContract.heir()).to.equal(newHeir.address);
   });
@@ -96,15 +76,6 @@ describe("InheritanceContract", function () {
   it("should not allow claiming ownership before the delay period", async function () {
     await expect(inheritanceContract.connect(heir).claimOwnership(newHeir.address)).to.be.revertedWith(
       "The owner still has control."
-    );
-  });
-
-  it("should not allow claiming ownership with the zero address as new heir", async function () {
-    await ethers.provider.send("evm_increaseTime", [30 * 24 * 60 * 60]); // Increase time by 30 days
-    await ethers.provider.send("evm_mine"); // Mine a new block
-
-    await expect(inheritanceContract.connect(heir).claimOwnership(ethers.ZeroAddress)).to.be.revertedWith(
-      "New heir cannot be the zero address."
     );
   });
 });

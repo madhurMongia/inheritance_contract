@@ -26,14 +26,12 @@ import type {
 export interface InheritanceContractInterface extends Interface {
   getFunction(
     nameOrSignature:
-      | "OWNERSHIP_TRANSFER_DELAY_DAYS"
+      | "OWNERSHIP_TRANSFER_DELAY"
       | "claimOwnership"
       | "heir"
       | "lastWithdrawalTimestamp"
       | "owner"
-      | "renounceOwnership"
       | "setHeir"
-      | "transferOwnership"
       | "withdraw"
   ): FunctionFragment;
 
@@ -45,7 +43,7 @@ export interface InheritanceContractInterface extends Interface {
   ): EventFragment;
 
   encodeFunctionData(
-    functionFragment: "OWNERSHIP_TRANSFER_DELAY_DAYS",
+    functionFragment: "OWNERSHIP_TRANSFER_DELAY",
     values?: undefined
   ): string;
   encodeFunctionData(
@@ -59,15 +57,7 @@ export interface InheritanceContractInterface extends Interface {
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
-    functionFragment: "renounceOwnership",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "setHeir",
-    values: [AddressLike]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "transferOwnership",
     values: [AddressLike]
   ): string;
   encodeFunctionData(
@@ -76,7 +66,7 @@ export interface InheritanceContractInterface extends Interface {
   ): string;
 
   decodeFunctionResult(
-    functionFragment: "OWNERSHIP_TRANSFER_DELAY_DAYS",
+    functionFragment: "OWNERSHIP_TRANSFER_DELAY",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -89,15 +79,7 @@ export interface InheritanceContractInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "owner", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "renounceOwnership",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "setHeir", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "transferOwnership",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(functionFragment: "withdraw", data: BytesLike): Result;
 }
 
@@ -183,10 +165,10 @@ export interface InheritanceContract extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
-  OWNERSHIP_TRANSFER_DELAY_DAYS: TypedContractMethod<[], [bigint], "view">;
+  OWNERSHIP_TRANSFER_DELAY: TypedContractMethod<[], [bigint], "view">;
 
   claimOwnership: TypedContractMethod<
-    [_newheir: AddressLike],
+    [_newHeir: AddressLike],
     [void],
     "nonpayable"
   >;
@@ -197,15 +179,7 @@ export interface InheritanceContract extends BaseContract {
 
   owner: TypedContractMethod<[], [string], "view">;
 
-  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
-
   setHeir: TypedContractMethod<[_heir: AddressLike], [void], "nonpayable">;
-
-  transferOwnership: TypedContractMethod<
-    [newOwner: AddressLike],
-    [void],
-    "nonpayable"
-  >;
 
   withdraw: TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
 
@@ -214,11 +188,11 @@ export interface InheritanceContract extends BaseContract {
   ): T;
 
   getFunction(
-    nameOrSignature: "OWNERSHIP_TRANSFER_DELAY_DAYS"
+    nameOrSignature: "OWNERSHIP_TRANSFER_DELAY"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
     nameOrSignature: "claimOwnership"
-  ): TypedContractMethod<[_newheir: AddressLike], [void], "nonpayable">;
+  ): TypedContractMethod<[_newHeir: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "heir"
   ): TypedContractMethod<[], [string], "view">;
@@ -229,14 +203,8 @@ export interface InheritanceContract extends BaseContract {
     nameOrSignature: "owner"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
-    nameOrSignature: "renounceOwnership"
-  ): TypedContractMethod<[], [void], "nonpayable">;
-  getFunction(
     nameOrSignature: "setHeir"
   ): TypedContractMethod<[_heir: AddressLike], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "transferOwnership"
-  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "withdraw"
   ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
